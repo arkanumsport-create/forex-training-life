@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { SkipForward, TrendingUp, TrendingDown } from "lucide-react";
-import { siteConfig } from "@/config/siteConfig";
+import { siteConfig, assetPath } from "@/config/siteConfig";
 
 interface IntroPreloaderProps {
   onComplete?: () => void;
@@ -133,7 +133,7 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
           <div className="relative z-20 flex items-center justify-between px-5 pt-5 sm:px-10 sm:pt-7">
             <div className="flex items-center gap-3">
               <img
-                src="/logo.png"
+                src={assetPath("/logo.png")}
                 alt="ForexTraining Life"
                 className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl border border-[#F5B041]/50 object-cover shadow-[0_0_20px_rgba(245,176,65,0.25)]"
               />

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Download, Share, PlusSquare, X, Smartphone, CheckCircle2 } from "lucide-react";
+import { assetPath } from "@/config/siteConfig";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -37,7 +38,7 @@ export function PWAInstallProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     // Регистрация Service Worker для PWA
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker.register(assetPath("/sw.js")).catch(() => {});
     }
 
     // Проверка запущено ли уже как установленное PWA
@@ -113,7 +114,7 @@ export function PWAInstallProvider({ children }: { children: React.ReactNode }) 
 
             <div className="flex items-center gap-3.5 mb-5">
               <img
-                src="/logo.png"
+                src={assetPath("/logo.png")}
                 alt="ForexTraining Life"
                 className="h-14 w-14 rounded-xl border border-[#F5B041]/40 object-cover shadow-lg"
               />

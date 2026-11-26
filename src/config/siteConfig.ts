@@ -8,13 +8,21 @@ export interface YouTubeVideoItem {
   badge?: string;
 }
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
+export function assetPath(path: string): string {
+  if (!path.startsWith("/")) return path;
+  return `${basePath}${path}`;
+}
+
 export const siteConfig = {
+  basePath,
   name: "ForexTraining Life",
   shortName: "FTL Trading",
   tagline: "Forex & Crypto Trading Academy & Signals",
   description:
     "Профессиональный трейдинг на рынках Forex и Криптовалют. Системный анализ рынка, работа с золотом XAU/USD, обучение осознанной торговле и ежедневные торговые сигналы.",
-  url: "https://forextraininglife.com",
+  url: "https://arkanumsport-create.github.io/forex-training-life",
 
   // Флаги управления блоками (легкое включение/отключение без правки кода)
   features: {
@@ -188,7 +196,6 @@ export const siteConfig = {
       ],
       ctaLabel: "Перейти в Telegram @InfoForexTrainingLife",
       ctaHref: "https://t.me/InfoForexTrainingLife",
-      // Визуальный мокап поста с сигналом из Telegram
       sampleSignal: {
         channelName: "ForexTraining Life | Сигналы & Аналитика",
         handle: "@InfoForexTrainingLife",
@@ -214,7 +221,6 @@ export const siteConfig = {
     subtitle:
       "Свежие видеоролики подтягиваются автоматически с официального канала @forextraininglife. Нажмите на любой выпуск, чтобы открыть разбор на YouTube.",
     channelUrl: "https://www.youtube.com/@forextraininglife",
-    // Реальные свежие видео с канала @forextraininglife (используются как мгновенный SSR/фоллбэк до ответа RSS)
     initialVideos: [
       {
         id: "8GDkHcS_3cw",
@@ -257,7 +263,7 @@ export const siteConfig = {
     ] as YouTubeVideoItem[],
   },
 
-  // Блок 6: Форматы участия (скрыт при features.showPricing = false, готов к включению в любой момент)
+  // Блок 6: Форматы участия (скрыт при features.showPricing = false)
   pricing: {
     badge: "ФОРМАТЫ УЧАСТИЯ",
     title: "Выберите свой формат работы",

@@ -11,7 +11,7 @@ import {
   BarChart3,
   Zap,
 } from "lucide-react";
-import { siteConfig } from "@/config/siteConfig";
+import { siteConfig, assetPath } from "@/config/siteConfig";
 
 export default function HeroAnimated() {
   // Триггер для периодического повтора побуквенного проявления заголовка по ТЗ
@@ -147,7 +147,7 @@ export default function HeroAnimated() {
               <div className="flex items-center justify-between border-b border-white/10 pb-3.5">
                 <div className="flex items-center gap-2.5">
                   <img
-                    src="/logo.png"
+                    src={assetPath("/logo.png")}
                     alt="FTL Logo"
                     className="h-9 w-9 rounded-lg border border-[#F5B041]/50 object-cover"
                   />

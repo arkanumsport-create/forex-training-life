@@ -1,15 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { siteConfig } from "@/config/siteConfig";
+import { siteConfig, assetPath } from "@/config/siteConfig";
 import { PWAInstallProvider } from "@/context/PWAInstallContext";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteConfig.url),
   title: `${siteConfig.name} — ${siteConfig.tagline}`,
   description: siteConfig.description,
-  manifest: "/manifest.json",
+  manifest: assetPath("/manifest.json"),
   icons: {
-    icon: "/favicon.png",
-    apple: "/icons/apple-touch-icon.png",
+    icon: assetPath("/favicon.png"),
+    apple: assetPath("/icons/apple-touch-icon.png"),
   },
   appleWebApp: {
     capable: true,
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
     title: `${siteConfig.name} — ${siteConfig.tagline}`,
     description: siteConfig.description,
     type: "website",
-    images: ["/logo.png"],
+    images: [assetPath("/logo.png")],
   },
 };
 

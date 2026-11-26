@@ -10,7 +10,7 @@ import {
   ShieldAlert,
   ExternalLink,
 } from "lucide-react";
-import { siteConfig } from "@/config/siteConfig";
+import { siteConfig, assetPath } from "@/config/siteConfig";
 import { usePWAInstall } from "@/context/PWAInstallContext";
 
 export default function Footer() {
@@ -28,7 +28,7 @@ export default function Footer() {
             <div className="lg:col-span-5">
               <div className="flex items-center gap-3.5">
                 <img
-                  src="/logo.png"
+                  src={assetPath("/logo.png")}
                   alt={siteConfig.name}
                   className="h-12 w-12 rounded-xl border border-[#F5B041]/50 object-cover"
                 />

@@ -11,7 +11,7 @@ import {
   Layers,
   Video,
 } from "lucide-react";
-import { siteConfig } from "@/config/siteConfig";
+import { siteConfig, assetPath } from "@/config/siteConfig";
 
 export default function ServicesSection() {
   const { education, signals } = siteConfig.services;
@@ -148,7 +148,7 @@ export default function ServicesSection() {
                 <div className="flex items-center justify-between border-b border-white/10 pb-3">
                   <div className="flex items-center gap-2.5">
                     <img
-                      src="/logo.png"
+                      src={assetPath("/logo.png")}
                       alt="Telegram Channel"
                       className="h-9 w-9 rounded-full border border-[#F5B041]/50 object-cover"
                     />

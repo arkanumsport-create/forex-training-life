@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Download, Menu, X, Send, Youtube, Instagram, CheckCircle2 } from "lucide-react";
-import { siteConfig } from "@/config/siteConfig";
+import { siteConfig, assetPath } from "@/config/siteConfig";
 import { usePWAInstall } from "@/context/PWAInstallContext";
 
 export default function Navbar() {
@@ -34,7 +34,7 @@ export default function Navbar() {
         >
           <div className="relative">
             <img
-              src="/logo.png"
+              src={assetPath("/logo.png")}
               alt={siteConfig.name}
               className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl border border-[#F5B041]/50 object-cover shadow-[0_0_15px_rgba(245,176,65,0.2)] transition-transform duration-300 group-hover:scale-105"
             />

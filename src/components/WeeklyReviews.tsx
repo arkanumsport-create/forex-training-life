@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Youtube, Play, ExternalLink, RefreshCw, Calendar, Eye } from "lucide-react";
-import { siteConfig, YouTubeVideoItem } from "@/config/siteConfig";
+import { siteConfig, YouTubeVideoItem, assetPath } from "@/config/siteConfig";
 
 function formatPublishDate(isoDate: string): string {
   try {
@@ -17,6 +17,35 @@ function formatPublishDate(isoDate: string): string {
   }
 }
 
+function enhanceVideoTitle(rawTitle: string): { title: string; badge: string } {
+  const clean = rawTitle.trim();
+  const lower = clean.toLowerCase();
+  if (lower.includes("обзор рынка")) {
+    return { title: clean, badge: "ЕЖЕНЕДЕЛЬНЫЙ ОБЗОР" };
+  }
+  if (lower.includes("xauusd") || lower.includes("золото") || lower.includes("gold")) {
+    const enhanced =
+      clean.length <= 15
+        ? `Золото XAU/USD (${clean}) — Техническая картина и торговый план`
+        : clean;
+    return { title: enhanced, badge: "XAU/USD GOLD" };
+  }
+  if (lower.includes("wti") || lower.includes("oil") || lower.includes("нефть")) {
+    const enhanced =
+      clean.length <= 15
+        ? `Нефть WTI (${clean}) — Разбор уровней и сценарий движения`
+        : clean;
+    return { title: enhanced, badge: "WTI OIL" };
+  }
+  if (clean.length <= 18) {
+    return {
+      title: `Разбор рынка и торговых инструментов (${clean}) — ForexTraining Life`,
+      badge: "ОБЗОР РЫНКА",
+    };
+  }
+  return { title: clean, badge: "АНАЛИТИКА РЫНКА" };
+}
+
 export default function WeeklyReviews() {
   const [videos, setVideos] = useState<YouTubeVideoItem[]>(
     siteConfig.marketReviews.initialVideos.slice(0, 4)
@@ -24,16 +53,56 @@ export default function WeeklyReviews() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Автоматическая подтяжка 4 самых свежих видео с YouTube-канала @forextraininglife
+  // Работает и на Vercel (/api/youtube), и на GitHub Pages (через rss2json YouTube feed)
   useEffect(() => {
     let active = true;
+    const channelId = siteConfig.socials.youtube.channelId;
+
     const fetchLatestVideos = async () => {
       setIsSyncing(true);
       try {
-        const res = await fetch("/api/youtube");
+        // 1. Сначала пробуем локальный API маршрут (для Vercel / Node сервера)
+        if (!siteConfig.basePath) {
+          const res = await fetch("/api/youtube");
+          if (res.ok) {
+            const data = await res.json();
+            if (active && Array.isArray(data.videos) && data.videos.length > 0) {
+              setVideos(data.videos.slice(0, 4));
+              return;
+            }
+          }
+        }
+
+        // 2. Прямая клиентская синхронизация с YouTube RSS (работает на GitHub Pages из браузера)
+        const rssUrl = encodeURIComponent(
+          `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`
+        );
+        const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`);
         if (!res.ok) return;
         const data = await res.json();
-        if (active && Array.isArray(data.videos) && data.videos.length > 0) {
-          setVideos(data.videos.slice(0, 4));
+        if (active && Array.isArray(data.items) && data.items.length > 0) {
+          const mapped: YouTubeVideoItem[] = data.items.slice(0, 4).map((item: {
+            guid?: string;
+            link?: string;
+            title?: string;
+            pubDate?: string;
+          }) => {
+            const vidFromGuid = item.guid ? item.guid.split(":").pop() : "";
+            const vidFromLink = item.link ? item.link.split("v=").pop() : "";
+            const id = (vidFromGuid || vidFromLink || "8GDkHcS_3cw").trim();
+            const { title, badge } = enhanceVideoTitle(item.title || "Обзор рынка");
+            return {
+              id,
+              title,
+              publishedAt: item.pubDate || new Date().toISOString(),
+              thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+              url: `https://www.youtube.com/watch?v=${id}`,
+              badge,
+            };
+          });
+          if (mapped.length > 0) {
+            setVideos(mapped);
+          }
         }
       } catch {
         // Оставляем initialVideos из siteConfig
@@ -138,7 +207,7 @@ export default function WeeklyReviews() {
               <div className="flex flex-1 flex-col justify-between p-4">
                 <div className="flex items-start gap-3">
                   <img
-                    src="/logo.png"
+                    src={assetPath("/logo.png")}
                     alt={siteConfig.name}
                     className="h-9 w-9 shrink-0 rounded-full border border-[#F5B041]/40 object-cover mt-0.5"
                   />

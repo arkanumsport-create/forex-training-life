@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Award, TrendingUp, Youtube, Users, CheckCircle2, Sparkles } from "lucide-react";
-import { siteConfig } from "@/config/siteConfig";
+import { siteConfig, assetPath } from "@/config/siteConfig";
 
 export default function AboutTrader() {
   const { showAuthorPhoto } = siteConfig.features;
@@ -63,7 +63,7 @@ export default function AboutTrader() {
               <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#111622] via-[#111622] to-[#0B0E14] p-6 sm:p-8 shadow-2xl">
                 <div className="flex items-center gap-4 border-b border-white/10 pb-5">
                   <img
-                    src="/logo.png"
+                    src={assetPath("/logo.png")}
                     alt="ForexTraining Life"
                     className="h-16 w-16 rounded-2xl border border-[#F5B041]/50 object-cover shadow-[0_0_25px_rgba(245,176,65,0.25)]"
                   />
