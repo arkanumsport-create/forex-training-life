@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Youtube, Play, ExternalLink, RefreshCw, Calendar, Eye } from "lucide-react";
 import { siteConfig, YouTubeVideoItem, assetPath } from "@/config/siteConfig";
 import { useAppSettings } from "@/context/AppSettingsContext";
@@ -19,31 +19,85 @@ function formatPublishDate(isoDate: string, lang: "ru" | "en"): string {
   }
 }
 
-function enhanceVideoTitle(rawTitle: string): { title: string; badge: string } {
+function enhanceVideoTitle(
+  rawTitle: string,
+  lang: "ru" | "en"
+): { title: string; badge: string } {
   const clean = rawTitle.trim();
   const lower = clean.toLowerCase();
+
   if (lower.includes("обзор рынка")) {
-    return { title: clean, badge: "WEEKLY REVIEW" };
+    return {
+      title: clean,
+      badge: lang === "ru" ? "ЕЖЕНЕДЕЛЬНЫЙ ОБЗОР" : "WEEKLY REVIEW",
+    };
   }
   if (lower.includes("xauusd") || lower.includes("золото") || lower.includes("gold")) {
     const enhanced =
       clean.length <= 15
-        ? `XAU/USD Gold (${clean}) — Technical Picture & Trading Plan`
+        ? lang === "ru"
+          ? `Золото XAU/USD (${clean}) — Техническая картина и торговый план`
+          : `XAU/USD Gold (${clean}) — Technical Picture & Trading Plan`
         : clean;
     return { title: enhanced, badge: "XAU/USD GOLD" };
   }
   if (lower.includes("wti") || lower.includes("oil") || lower.includes("нефть")) {
     const enhanced =
-      clean.length <= 15 ? `WTI Oil (${clean}) — Key Levels & Scenario` : clean;
+      clean.length <= 15
+        ? lang === "ru"
+          ? `Нефть WTI (${clean}) — Разбор уровней и сценарий движения`
+          : `WTI Oil (${clean}) — Key Levels & Scenario`
+        : clean;
     return { title: enhanced, badge: "WTI OIL" };
   }
   if (clean.length <= 18) {
     return {
-      title: `Market Analysis & Setups (${clean}) — ForexTraining Life`,
-      badge: "MARKET REVIEW",
+      title:
+        lang === "ru"
+          ? `Разбор рынка и торговых инструментов (${clean}) — ForexTraining Life`
+          : `Market Analysis & Setups (${clean}) — ForexTraining Life`,
+      badge: lang === "ru" ? "ОБЗОР РЫНКА" : "MARKET REVIEW",
     };
   }
-  return { title: clean, badge: "MARKET ANALYTICS" };
+  return {
+    title: clean,
+    badge: lang === "ru" ? "АНАЛИТИКА РЫНКА" : "MARKET ANALYTICS",
+  };
+}
+
+function parseYouTubeXml(xmlText: string, lang: "ru" | "en"): YouTubeVideoItem[] {
+  const entries = xmlText.split("<entry>").slice(1);
+  const parsed: YouTubeVideoItem[] = [];
+
+  for (const entry of entries) {
+    const idMatch = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
+    const titleMatch = entry.match(/<title>([^<]+)<\/title>/);
+    const pubMatch = entry.match(/<published>([^<]+)<\/published>/);
+    const viewsMatch = entry.match(/views="(\d+)"/);
+
+    if (idMatch && titleMatch) {
+      const id = idMatch[1].trim();
+      const rawTitle = titleMatch[1]
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+      const { title, badge } = enhanceVideoTitle(rawTitle, lang);
+      parsed.push({
+        id,
+        title,
+        publishedAt: pubMatch ? pubMatch[1].trim() : new Date().toISOString(),
+        thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+        url: `https://www.youtube.com/watch?v=${id}`,
+        views: viewsMatch ? viewsMatch[1] : undefined,
+        badge,
+      });
+    }
+    if (parsed.length >= 4) break;
+  }
+
+  return parsed;
 }
 
 export default function WeeklyReviews() {
@@ -55,69 +109,93 @@ export default function WeeklyReviews() {
   );
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Автоматическая подтяжка 4 самых свежих видео с YouTube-канала @forextraininglife
-  useEffect(() => {
-    let active = true;
+  // Тройная надежная автосинхронизация свежих видео с YouTube-канала @forextraininglife
+  const fetchLatestVideos = useCallback(async () => {
     const channelId = siteConfig.socials.youtube.channelId;
+    const rawRssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
+    setIsSyncing(true);
 
-    const fetchLatestVideos = async () => {
-      setIsSyncing(true);
-      try {
-        if (!siteConfig.basePath) {
-          const res = await fetch("/api/youtube");
+    try {
+      // 1. Локальный API роут (для Vercel / Node-сервера)
+      if (!siteConfig.basePath) {
+        try {
+          const res = await fetch("/api/youtube", { cache: "no-store" });
           if (res.ok) {
             const data = await res.json();
-            if (active && Array.isArray(data.videos) && data.videos.length > 0) {
+            if (Array.isArray(data.videos) && data.videos.length > 0) {
               setVideos(data.videos.slice(0, 4));
               return;
             }
           }
-        }
+        } catch {}
+      }
 
-        const rssUrl = encodeURIComponent(
-          `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`
+      // 2. Прямой XML YouTube RSS через CORS-прокси allorigins (дает точные просмотры + мгновенно свежие видео)
+      try {
+        const xmlRes = await fetch(
+          `https://api.allorigins.win/raw?url=${encodeURIComponent(rawRssUrl)}`,
+          { cache: "no-store" }
         );
-        const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (active && Array.isArray(data.items) && data.items.length > 0) {
-          const mapped: YouTubeVideoItem[] = data.items.slice(0, 4).map(
-            (item: {
-              guid?: string;
-              link?: string;
-              title?: string;
-              pubDate?: string;
-            }) => {
-              const vidFromGuid = item.guid ? item.guid.split(":").pop() : "";
-              const vidFromLink = item.link ? item.link.split("v=").pop() : "";
-              const id = (vidFromGuid || vidFromLink || "8GDkHcS_3cw").trim();
-              const { title, badge } = enhanceVideoTitle(item.title || "Market Review");
-              return {
-                id,
-                title,
-                publishedAt: item.pubDate || new Date().toISOString(),
-                thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
-                url: `https://www.youtube.com/watch?v=${id}`,
-                badge,
-              };
-            }
-          );
-          if (mapped.length > 0) {
-            setVideos(mapped);
+        if (xmlRes.ok) {
+          const xmlText = await xmlRes.text();
+          const parsed = parseYouTubeXml(xmlText, lang);
+          if (parsed.length > 0) {
+            setVideos(parsed);
+            return;
           }
         }
-      } catch {
-        // Оставляем initialVideos
-      } finally {
-        if (active) setIsSyncing(false);
-      }
-    };
+      } catch {}
 
+      // 3. Резервный канал через rss2json
+      try {
+        const rssRes = await fetch(
+          `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rawRssUrl)}`,
+          { cache: "no-store" }
+        );
+        if (rssRes.ok) {
+          const data = await rssRes.json();
+          if (Array.isArray(data.items) && data.items.length > 0) {
+            const mapped: YouTubeVideoItem[] = data.items.slice(0, 4).map(
+              (item: {
+                guid?: string;
+                link?: string;
+                title?: string;
+                pubDate?: string;
+              }) => {
+                const vidFromGuid = item.guid ? item.guid.split(":").pop() : "";
+                const vidFromLink = item.link ? item.link.split("v=").pop() : "";
+                const id = (vidFromGuid || vidFromLink || "8GDkHcS_3cw").trim();
+                const { title, badge } = enhanceVideoTitle(
+                  item.title || "Market Review",
+                  lang
+                );
+                return {
+                  id,
+                  title,
+                  publishedAt: item.pubDate || new Date().toISOString(),
+                  thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+                  url: `https://www.youtube.com/watch?v=${id}`,
+                  badge,
+                };
+              }
+            );
+            if (mapped.length > 0) {
+              setVideos(mapped);
+            }
+          }
+        }
+      } catch {}
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [lang]);
+
+  useEffect(() => {
     fetchLatestVideos();
-    return () => {
-      active = false;
-    };
-  }, []);
+    // Автоматически перепроверяем появление новых роликов на YouTube каждые 5 минут
+    const interval = setInterval(fetchLatestVideos, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [fetchLatestVideos]);
 
   return (
     <section
@@ -132,7 +210,15 @@ export default function WeeklyReviews() {
             <div className="inline-flex items-center gap-2 rounded-full border border-rose-500/40 dark:border-[#FF3D57]/30 bg-white dark:bg-[#111622] px-3.5 py-1 text-xs font-bold tracking-wider text-rose-600 dark:text-[#FF3D57] shadow-sm">
               <Youtube className="h-4 w-4" />
               <span>{t.reviews.badge}</span>
-              {isSyncing && <RefreshCw className="h-3 w-3 animate-spin text-amber-500" />}
+              <button
+                onClick={fetchLatestVideos}
+                title={lang === "ru" ? "Обновить список видео" : "Refresh videos"}
+                className="ml-1 rounded-full p-0.5 hover:bg-rose-500/10 cursor-pointer"
+              >
+                <RefreshCw
+                  className={`h-3 w-3 text-amber-500 ${isSyncing ? "animate-spin" : ""}`}
+                />
+              </button>
             </div>
             <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
               {t.reviews.title}
@@ -154,7 +240,7 @@ export default function WeeklyReviews() {
           </a>
         </div>
 
-        {/* Сетка из 4 свежих видеокарточек в стиле YouTube */}
+        {/* 4 свежих видеокарточки в стиле YouTube с обложкой и переходом на YouTube */}
         <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {videos.map((video, index) => (
             <a
