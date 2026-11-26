@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Send,
@@ -10,51 +10,81 @@ import {
   ShieldCheck,
   BarChart3,
   Zap,
+  LineChart,
+  ExternalLink,
 } from "lucide-react";
 import { siteConfig, assetPath } from "@/config/siteConfig";
+import { useAppSettings } from "@/context/AppSettingsContext";
+import { getT, MARKET_QUOTES } from "@/config/translations";
 
-export default function HeroAnimated() {
-  // Триггер для периодического повтора побуквенного проявления заголовка по ТЗ
+interface HeroAnimatedProps {
+  introDone?: boolean;
+}
+
+export default function HeroAnimated({ introDone = false }: HeroAnimatedProps) {
+  const { lang } = useAppSettings();
+  const t = getT(lang);
+
+  // Фильтр в списке 10 котировок справа: Все (10) / Forex (5) / Crypto (5)
+  const [quoteFilter, setQuoteFilter] = useState<"all" | "forex" | "crypto">("all");
   const [animCycle, setAnimCycle] = useState(0);
+  const bgVideoRef = useRef<HTMLVideoElement | null>(null);
+  const videoPlayedOnceRef = useRef(false);
 
+  // Периодический повтор анимации букв заголовка
   useEffect(() => {
     const interval = setInterval(() => {
       setAnimCycle((prev) => prev + 1);
-    }, 9000);
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  const titleWords = siteConfig.hero.animatedTitle.split(" ");
+  // Видео-фон графика проигрывается 1 раз сразу после заставки и застывает на последнем кадре (статика)
+  useEffect(() => {
+    if (introDone && bgVideoRef.current && !videoPlayedOnceRef.current) {
+      videoPlayedOnceRef.current = true;
+      bgVideoRef.current.currentTime = 0;
+      bgVideoRef.current.play().catch(() => {});
+    }
+  }, [introDone]);
+
+  const filteredQuotes = MARKET_QUOTES.filter((q) =>
+    quoteFilter === "all" ? true : q.category === quoteFilter
+  );
+
+  const titleWords = t.hero.animatedTitle.split(" ");
 
   return (
-    <section className="relative overflow-hidden bg-[#0B0E14] pt-8 pb-0 sm:pt-14">
-      {/* Фоновые эффекты и сетка */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-20"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px)",
-          backgroundSize: "52px 52px",
-        }}
+    <section className="relative overflow-hidden border-b border-slate-200 dark:border-white/10 bg-slate-950">
+      {/* Анимационный видео-фон графика (под верхней шапкой): играет 1 раз и застывает на финальном кадре */}
+      <video
+        ref={bgVideoRef}
+        src={assetPath("/videos/hero-chart-bg.mp4")}
+        muted
+        playsInline
+        preload="auto"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-55 dark:opacity-50"
       />
-      <div className="pointer-events-none absolute -top-28 left-1/3 h-96 w-96 rounded-full bg-[#F5B041]/10 blur-[140px]" />
-      <div className="pointer-events-none absolute top-1/3 right-10 h-96 w-96 rounded-full bg-[#00E676]/10 blur-[140px]" />
 
-      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-12">
-          {/* Левая колонка (7 колонок): Анимированный заголовок, описание и CTA кнопки */}
-          <div className="lg:col-span-7">
+      {/* Контрастная вуаль для 100% читаемости текста и в Тёмной, и в Светлой теме */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#07090F]/92 via-[#0B0E14]/82 to-[#07090F]/88 dark:from-[#07090F]/90 dark:via-[#0B0E14]/78 dark:to-[#07090F]/88" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-slate-50 dark:from-[#0B0E14] to-transparent" />
+
+      <div className="relative z-10 mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
+        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12 lg:gap-10">
+          {/* Левая колонка (6 колонок): Заголовок, слоган, описание и целевые кнопки */}
+          <div className="lg:col-span-6 lg:pt-4">
             {/* Верхний бейдж */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#F5B041]/30 bg-[#111622] px-3.5 py-1.5 text-xs font-bold tracking-wider text-[#F5B041] shadow-[0_0_20px_rgba(245,176,65,0.12)]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#F5B041]/40 bg-[#0B0E14]/80 px-3.5 py-1.5 text-[11px] sm:text-xs font-bold tracking-wider text-[#F5B041] backdrop-blur-md shadow-lg">
               <span className="h-2 w-2 rounded-full bg-[#00E676] animate-pulse" />
-              <span>{siteConfig.hero.badge}</span>
+              <span>{t.hero.badge}</span>
             </div>
 
-            {/* Периодически проявляющийся по буквам заголовок: «Добро пожаловать на наш сайт ForexTraining Life» */}
+            {/* Побуквенно проявляющийся заголовок */}
             <h1
-              key={animCycle}
-              aria-label={siteConfig.hero.animatedTitle}
-              className="mt-5 text-3xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-[52px] lg:leading-[1.15]"
+              key={`${lang}-${animCycle}`}
+              aria-label={t.hero.animatedTitle}
+              className="mt-5 text-3xl font-black tracking-tight text-white sm:text-5xl lg:leading-[1.14] drop-shadow-[0_2px_16px_rgba(0,0,0,0.85)]"
             >
               {titleWords.map((word, wordIdx) => {
                 const isBrand =
@@ -65,20 +95,20 @@ export default function HeroAnimated() {
                     className="mr-3 inline-block whitespace-nowrap"
                   >
                     {Array.from(word).map((char, charIdx) => {
-                      const delay = (wordIdx * 6 + charIdx) * 0.032;
+                      const delay = (wordIdx * 5 + charIdx) * 0.028;
                       return (
                         <motion.span
                           key={`${char}-${charIdx}`}
-                          initial={{ opacity: 0, y: 14, filter: "blur(4px)" }}
+                          initial={{ opacity: 0, y: 12, filter: "blur(4px)" }}
                           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                           transition={{
-                            duration: 0.32,
+                            duration: 0.3,
                             delay,
                             ease: "easeOut",
                           }}
                           className={
                             isBrand
-                              ? " inline-block bg-gradient-to-r from-[#F5B041] via-[#FFD166] to-[#00E676] bg-clip-text text-transparent"
+                              ? "inline-block bg-gradient-to-r from-[#F5B041] via-[#FFD166] to-[#00E676] bg-clip-text text-transparent"
                               : "inline-block text-white"
                           }
                         >
@@ -91,42 +121,45 @@ export default function HeroAnimated() {
               })}
             </h1>
 
-            {/* Подзаголовок и описание сути проекта */}
-            <p className="mt-5 max-w-2xl text-base leading-relaxed text-slate-300 sm:text-lg">
-              {siteConfig.hero.subtitle}
+            {/* Слоган */}
+            <p className="mt-3 text-base sm:text-xl font-bold text-[#F5B041] drop-shadow">
+              {t.hero.slogan}
             </p>
 
-            {/* Целевые кнопки (CTA) */}
-            <div className="mt-8 flex flex-col gap-3.5 sm:flex-row sm:items-center">
-              {/* Основная кнопка: Золото/Зеленый градиент */}
+            {/* Описание проекта */}
+            <p className="mt-4 max-w-xl text-sm sm:text-base leading-relaxed text-slate-200">
+              {t.hero.subtitle}
+            </p>
+
+            {/* Целевые кнопки CTA */}
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
               <a
-                href={siteConfig.hero.primaryCta.href}
+                href={siteConfig.socials.telegram.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group inline-flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-[#F5B041] via-[#c7d95b] to-[#00E676] px-6 py-4 text-sm sm:text-base font-extrabold text-[#0B0E14] shadow-[0_0_30px_rgba(0,230,118,0.28)] hover:opacity-95 hover:shadow-[0_0_40px_rgba(245,176,65,0.45)] transition"
+                className="group inline-flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-[#F5B041] via-[#cbe05a] to-[#00E676] px-6 py-4 text-sm sm:text-base font-extrabold text-[#0B0E14] shadow-[0_0_30px_rgba(245,176,65,0.35)] hover:opacity-95 transition"
               >
                 <Send className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-                <span>{siteConfig.hero.primaryCta.label}</span>
+                <span>{t.hero.primaryCta}</span>
               </a>
 
-              {/* Вторичная кнопка: Контурная (скролл к видео-блоку Обзор рынка) */}
               <a
-                href={siteConfig.hero.secondaryCta.href}
-                className="inline-flex items-center justify-center gap-2.5 rounded-xl border border-white/20 bg-[#111622]/90 px-6 py-4 text-sm sm:text-base font-bold text-white hover:border-[#F5B041] hover:text-[#F5B041] transition"
+                href="#market-review"
+                className="inline-flex items-center justify-center gap-2.5 rounded-xl border border-white/25 bg-[#0B0E14]/75 px-6 py-4 text-sm sm:text-base font-bold text-white backdrop-blur-md hover:border-[#F5B041] hover:text-[#F5B041] transition"
               >
                 <PlayCircle className="h-5 w-5 text-[#F5B041]" />
-                <span>{siteConfig.hero.secondaryCta.label}</span>
+                <span>{t.hero.secondaryCta}</span>
               </a>
             </div>
 
-            {/* 3 ключевых преимущества под кнопками */}
-            <div className="mt-9 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {siteConfig.hero.highlights.map((item, idx) => (
+            {/* 3 ключевых блока преимуществ */}
+            <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {t.hero.highlights.map((item, idx) => (
                 <div
                   key={item.label}
-                  className="rounded-xl border border-white/10 bg-[#111622]/80 p-3.5 backdrop-blur-sm"
+                  className="rounded-xl border border-white/15 bg-[#0B0E14]/75 p-3.5 backdrop-blur-md"
                 >
-                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
                     {idx === 0 && <BarChart3 className="h-4 w-4 text-[#F5B041]" />}
                     {idx === 1 && <ShieldCheck className="h-4 w-4 text-[#00E676]" />}
                     {idx === 2 && <Zap className="h-4 w-4 text-[#F5B041]" />}
@@ -140,218 +173,129 @@ export default function HeroAnimated() {
             </div>
           </div>
 
-          {/* Правая колонка (5 колонок): Брендовый аналитический терминал XAU/USD (БЕЗ фото автора по ТЗ) */}
-          <div className="lg:col-span-5">
-            <div className="relative rounded-2xl border border-white/15 bg-[#111622]/95 p-5 shadow-[0_0_50px_rgba(0,0,0,0.75)]">
-              {/* Верхняя шапка терминала */}
-              <div className="flex items-center justify-between border-b border-white/10 pb-3.5">
+          {/* Правая колонка (6 колонок): Список 10 котировок (5 Forex + 5 Crypto) с кнопкой «Смотреть график» в TradingView */}
+          <div className="lg:col-span-6">
+            <div className="rounded-2xl border border-slate-200/80 dark:border-white/15 bg-white/95 dark:bg-[#111622]/92 p-4 sm:p-5 backdrop-blur-xl shadow-2xl">
+              {/* Заголовок панели котировок */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-white/10 pb-3.5">
                 <div className="flex items-center gap-2.5">
-                  <img
-                    src={assetPath("/logo.png")}
-                    alt="FTL Logo"
-                    className="h-9 w-9 rounded-lg border border-[#F5B041]/50 object-cover"
-                  />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15 dark:bg-[#F5B041]/15 border border-amber-500/30 dark:border-[#F5B041]/40 text-amber-600 dark:text-[#F5B041]">
+                    <LineChart className="h-5 w-5" />
+                  </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm font-extrabold text-white">
-                        XAU / USD
-                      </span>
-                      <span className="rounded bg-[#F5B041]/20 px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#F5B041]">
-                        GOLD SPOT
+                      <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
+                        {t.hero.quotesPanel.title}
+                      </h2>
+                      <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-emerald-700 dark:text-[#00E676]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-[#00E676] animate-pulse" />
+                        {t.hero.quotesPanel.liveBadge}
                       </span>
                     </div>
-                    <span className="text-[11px] text-slate-400">
-                      Опционные зоны & Структура H4
-                    </span>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {t.hero.quotesPanel.subtitle}
+                    </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-mono text-lg font-black text-[#00E676]">
-                    $2,718.45
-                  </div>
-                  <div className="font-mono text-xs font-bold text-[#00E676]">
-                    +1.42% (+38.10) ▲
-                  </div>
+
+                {/* Фильтр: Все (10) / Forex (5) / Crypto (5) */}
+                <div className="flex items-center rounded-xl bg-slate-100 dark:bg-[#0B0E14] p-1 border border-slate-200 dark:border-white/10">
+                  {(
+                    [
+                      { key: "all", label: t.hero.quotesPanel.tabAll },
+                      { key: "forex", label: t.hero.quotesPanel.tabForex },
+                      { key: "crypto", label: t.hero.quotesPanel.tabCrypto },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setQuoteFilter(tab.key)}
+                      className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+                        quoteFilter === tab.key
+                          ? "bg-amber-500 dark:bg-[#F5B041] text-white dark:text-[#0B0E14] shadow-sm"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Визуализация графика и уровней Take-Profit / Liquidity */}
-              <div className="relative my-4 rounded-xl border border-white/5 bg-[#0B0E14] p-3.5">
-                <div className="mb-2 flex items-center justify-between text-[11px]">
-                  <span className="font-mono text-[#00E676] font-bold">
-                    ● BUY ZONE ACTIVE (LONG)
-                  </span>
-                  <span className="font-mono text-slate-400">RR 1 : 3.2</span>
-                </div>
-
-                <svg viewBox="0 0 420 175" className="h-40 w-full overflow-visible">
-                  <defs>
-                    <linearGradient id="heroChartGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#00E676" stopOpacity="0.28" />
-                      <stop offset="100%" stopColor="#00E676" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* Уровень Take Profit */}
-                  <line
-                    x1="10"
-                    y1="26"
-                    x2="410"
-                    y2="26"
-                    stroke="#00E676"
-                    strokeDasharray="4 4"
-                    strokeOpacity="0.6"
-                  />
-                  <text
-                    x="14"
-                    y="20"
-                    fill="#00E676"
-                    fontSize="9"
-                    fontFamily="monospace"
-                    fontWeight="bold"
+              {/* Список котировок (до 10 штук: 5 Forex + 5 Crypto) */}
+              <div className="mt-3 divide-y divide-slate-200/80 dark:divide-white/5 max-h-[440px] overflow-y-auto pr-1">
+                {filteredQuotes.map((quote) => (
+                  <div
+                    key={quote.symbol}
+                    className="group flex items-center justify-between gap-2 py-2.5 px-2 rounded-xl hover:bg-slate-100/90 dark:hover:bg-white/[0.04] transition"
                   >
-                    TAKE PROFIT 2: 2,738.50
-                  </text>
+                    {/* Инструмент и категория */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className={`shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[9px] font-extrabold uppercase ${
+                          quote.category === "forex"
+                            ? "bg-amber-500/15 text-amber-700 dark:text-[#F5B041] border border-amber-500/30"
+                            : "bg-sky-500/15 text-sky-700 dark:text-sky-400 border border-sky-500/30"
+                        }`}
+                      >
+                        {quote.category === "forex" ? "FX" : "CR"}
+                      </span>
+                      <div className="min-w-0">
+                        <div
+                          className={`font-mono text-xs sm:text-sm font-extrabold truncate ${
+                            quote.isGold
+                              ? "text-amber-600 dark:text-[#F5B041]"
+                              : "text-slate-900 dark:text-white"
+                          }`}
+                        >
+                          {quote.symbol}
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                          {quote.label}
+                        </div>
+                      </div>
+                    </div>
 
-                  {/* Уровень баланса / входа */}
-                  <line
-                    x1="10"
-                    y1="95"
-                    x2="410"
-                    y2="95"
-                    stroke="#F5B041"
-                    strokeDasharray="4 4"
-                    strokeOpacity="0.5"
-                  />
-                  <text
-                    x="14"
-                    y="89"
-                    fill="#F5B041"
-                    fontSize="9"
-                    fontFamily="monospace"
-                    fontWeight="bold"
-                  >
-                    OPTION BALANCE / ENTRY: 2,710.00
-                  </text>
+                    {/* Цена и процент */}
+                    <div className="text-right shrink-0">
+                      <div className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
+                        {quote.price}
+                      </div>
+                      <div
+                        className={`inline-flex items-center gap-0.5 font-mono text-[10px] font-bold ${
+                          quote.isPositive
+                            ? "text-emerald-600 dark:text-[#00E676]"
+                            : "text-rose-600 dark:text-[#FF3D57]"
+                        }`}
+                      >
+                        {quote.isPositive ? (
+                          <TrendingUp className="h-3 w-3" />
+                        ) : (
+                          <TrendingDown className="h-3 w-3" />
+                        )}
+                        {quote.change}
+                      </div>
+                    </div>
 
-                  {/* Уровень Stop Loss */}
-                  <line
-                    x1="10"
-                    y1="150"
-                    x2="410"
-                    y2="150"
-                    stroke="#FF3D57"
-                    strokeDasharray="4 4"
-                    strokeOpacity="0.5"
-                  />
-                  <text
-                    x="14"
-                    y="163"
-                    fill="#FF3D57"
-                    fontSize="9"
-                    fontFamily="monospace"
-                    fontWeight="bold"
-                  >
-                    STOP LOSS: 2,698.00
-                  </text>
-
-                  {/* Область и кривая цены */}
-                  <path
-                    d="M 15 135 L 55 120 L 95 130 L 135 98 L 175 112 L 215 76 L 255 88 L 295 58 L 335 68 L 375 38 L 405 28 L 405 165 L 15 165 Z"
-                    fill="url(#heroChartGrad)"
-                  />
-                  <motion.path
-                    d="M 15 135 L 55 120 L 95 130 L 135 98 L 175 112 L 215 76 L 255 88 L 295 58 L 335 68 L 375 38 L 405 28"
-                    fill="none"
-                    stroke="#00E676"
-                    strokeWidth="2.8"
-                    strokeLinecap="round"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ duration: 2.2, ease: "easeInOut" }}
-                  />
-
-                  {/* Точка текущей цены */}
-                  <circle cx="405" cy="28" r="5" fill="#F5B041" />
-                  <circle
-                    cx="405"
-                    cy="28"
-                    r="10"
-                    fill="none"
-                    stroke="#F5B041"
-                    strokeWidth="1.5"
-                    opacity="0.6"
-                  />
-                </svg>
+                    {/* Кнопка «Смотреть график» — открывает TradingView */}
+                    <a
+                      href={quote.tvUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-amber-500/40 dark:border-[#F5B041]/40 bg-amber-500/10 dark:bg-[#F5B041]/10 px-2.5 py-1.5 text-[11px] font-bold text-amber-700 dark:text-[#F5B041] hover:bg-amber-500 hover:text-white dark:hover:bg-[#F5B041] dark:hover:text-[#0B0E14] transition"
+                    >
+                      <span>{t.hero.quotesPanel.viewChart}</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                ))}
               </div>
 
-              {/* Нижние метрики терминала */}
-              <div className="grid grid-cols-3 gap-2.5 text-center">
-                <div className="rounded-xl border border-white/5 bg-[#0B0E14] p-2.5">
-                  <span className="block text-[10px] uppercase text-slate-400">
-                    Тренд D1/H4
-                  </span>
-                  <span className="mt-0.5 block font-mono text-xs font-extrabold text-[#00E676]">
-                    BULLISH ▲
-                  </span>
-                </div>
-                <div className="rounded-xl border border-white/5 bg-[#0B0E14] p-2.5">
-                  <span className="block text-[10px] uppercase text-slate-400">
-                    Инструменты
-                  </span>
-                  <span className="mt-0.5 block font-mono text-xs font-extrabold text-[#F5B041]">
-                    Forex & Crypto
-                  </span>
-                </div>
-                <div className="rounded-xl border border-white/5 bg-[#0B0E14] p-2.5">
-                  <span className="block text-[10px] uppercase text-slate-400">
-                    Опыт в рынке
-                  </span>
-                  <span className="mt-0.5 block font-mono text-xs font-extrabold text-white">
-                    17+ ЛЕТ
-                  </span>
-                </div>
+              {/* Подсказка внизу панели */}
+              <div className="mt-3 border-t border-slate-200 dark:border-white/10 pt-2.5 text-center text-[11px] text-slate-500 dark:text-slate-400">
+                {t.hero.quotesPanel.footerNote}
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Бегущая строка / Виджет котировок (Ticker Tape): XAU/USD, EUR/USD, GBP/USD, BTC/USDT, ETH/USDT */}
-      <div className="mt-12 border-y border-white/10 bg-[#111622]/90 py-3">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            {siteConfig.tickers.map((ticker) => (
-              <div
-                key={ticker.symbol}
-                className="flex items-center gap-2.5 rounded-xl border border-white/5 bg-[#0B0E14]/80 px-3.5 py-2"
-              >
-                <span
-                  className={`font-mono text-xs font-extrabold ${
-                    ticker.isGold ? "text-[#F5B041]" : "text-white"
-                  }`}
-                >
-                  {ticker.symbol}
-                </span>
-                <span className="font-mono text-xs font-bold text-slate-200">
-                  {ticker.price}
-                </span>
-                <span
-                  className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-mono text-[11px] font-bold ${
-                    ticker.isPositive
-                      ? "bg-[#00E676]/15 text-[#00E676]"
-                      : "bg-[#FF3D57]/15 text-[#FF3D57]"
-                  }`}
-                >
-                  {ticker.isPositive ? (
-                    <TrendingUp className="h-3 w-3" />
-                  ) : (
-                    <TrendingDown className="h-3 w-3" />
-                  )}
-                  {ticker.change}
-                </span>
-              </div>
-            ))}
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-const CACHE_NAME = "ftl-trading-pwa-v1";
+const CACHE_NAME = "ftl-trading-pwa-v2";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
