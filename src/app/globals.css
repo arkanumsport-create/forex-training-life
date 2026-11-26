@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #0B0E14;
+  --bg-secondary: #111622;
+  --accent-green: #00E676;
+  --accent-red: #FF3D57;
+  --accent-gold: #F5B041;
+}
+
+html {
+  scroll-behavior: smooth;
+  background-color: #0B0E14;
+  color: #f8fafc;
+}
+
+body {
+  background-color: #0B0E14;
+  color: #f8fafc;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Кастомный скроллбар в стиле Dark Fintech */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0B0E14;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #F5B041;
+}
