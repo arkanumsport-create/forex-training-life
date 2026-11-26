@@ -14,8 +14,8 @@ interface IntroPreloaderProps {
 export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [showTitles, setShowTitles] = useState(false);
+  const [isPortraitMobile, setIsPortraitMobile] = useState<boolean | null>(null);
   const mainVideoRef = useRef<HTMLVideoElement | null>(null);
-  const ambientVideoRef = useRef<HTMLVideoElement | null>(null);
   const finishedRef = useRef(false);
   const { lang } = useAppSettings();
   const t = getT(lang);
@@ -38,20 +38,22 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
       return;
     }
 
-    // Блокируем скролл страницы, пока идет заставка
+    // Определяем: вертикальный экран телефона/PWA (9:16) или горизонтальный ПК (16:9)
+    const checkIsMobilePortrait = () => {
+      return window.innerWidth < 768 || window.innerHeight > window.innerWidth;
+    };
+    setIsPortraitMobile(checkIsMobilePortrait());
+
+    // Блокируем скролл страницы во время заставки
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    // Запускаем основное и фоновое амбиент-видео синхронно
-    mainVideoRef.current?.play().catch(() => {});
-    ambientVideoRef.current?.play().catch(() => {});
-
-    // На ~3.2 сек (столкновение и взрыв Быка и Медведя) выводим титры
+    // Через ~3.2 сек (столкновение и взрыв Быка и Медведя) выводим титры
     const titleTimer = setTimeout(() => {
       setShowTitles(true);
     }, 3200);
 
-    // Плавный выход на сайт
+    // Плавный переход на сайт
     const exitTimer = setTimeout(() => {
       handleFinish();
     }, 6200);
@@ -62,6 +64,20 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
       clearTimeout(exitTimer);
     };
   }, []);
+
+  // Запускаем видео сразу после выбора нужного файла (9:16 или 16:9)
+  useEffect(() => {
+    if (isPortraitMobile !== null && mainVideoRef.current) {
+      mainVideoRef.current.play().catch(() => {});
+    }
+  }, [isPortraitMobile]);
+
+  const videoSrc =
+    isPortraitMobile === null
+      ? null
+      : isPortraitMobile
+      ? assetPath("/videos/bull-bear-intro-mobile.mp4")
+      : assetPath("/videos/bull-bear-intro.mp4");
 
   return (
     <AnimatePresence>
@@ -81,68 +97,58 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
             paddingLeft: "env(safe-area-inset-left)",
             paddingRight: "env(safe-area-inset-right)",
           }}
-          className="fixed inset-0 z-[150] flex h-[100dvh] w-screen flex-col items-center justify-center overflow-hidden bg-[#04060A] text-white select-none"
+          className="fixed inset-0 z-[150] flex h-[100dvh] w-screen items-center justify-center overflow-hidden bg-[#04060A] text-white select-none"
         >
-          {/* Мягкий размытый амбиент-фон (заполняет пустые поля на вертикальном экране PWA/телефона и сверхшироких мониторах ПК) */}
-          <video
-            ref={ambientVideoRef}
-            src={assetPath("/videos/bull-bear-intro.mp4")}
-            autoPlay
-            muted
-            playsInline
-            preload="auto"
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-2xl"
-          />
-
-          {/* Основной четкий видео-контейнер с точным вписыванием в экран:
-              - Мобильный / PWA (вертикальный экран): полная ширина экрана, формат 16:9 по центру (Бык и Медведь видны целиком!)
-              - ПК / Планшет (горизонтальный экран): четкое вписывание в 100vw x 100dvh без обрезания краев (object-contain) */}
-          <div className="relative z-10 flex h-full w-full items-center justify-center px-0 sm:px-4 md:px-8">
-            <div className="relative flex w-full max-w-[100vw] items-center justify-center md:h-full md:max-h-[92dvh] md:max-w-[1520px]">
+          {/* Видео-заставка:
+              - Телефон / PWA (9:16): bull-bear-intro-mobile.mp4 во весь вертикальный экран (object-cover)
+              - ПК / Горизонтальный экран (16:9): bull-bear-intro.mp4 четко по размеру экрана (object-contain) */}
+          {videoSrc && (
+            <div className="absolute inset-0 z-10 flex h-full w-full items-center justify-center bg-[#04060A]">
               <video
                 ref={mainVideoRef}
-                src={assetPath("/videos/bull-bear-intro.mp4")}
+                key={videoSrc}
+                src={videoSrc}
                 autoPlay
                 muted
                 playsInline
                 preload="auto"
                 onEnded={handleFinish}
-                className="w-full max-h-[58dvh] object-contain sm:max-h-[75dvh] md:h-full md:max-h-[90dvh] md:w-full md:rounded-2xl md:border md:border-white/10 md:shadow-[0_0_80px_rgba(0,0,0,0.9)]"
+                className={
+                  isPortraitMobile
+                    ? "h-full w-full object-cover"
+                    : "h-full w-full max-h-[100dvh] max-w-[100vw] object-contain"
+                }
               />
             </div>
-          </div>
+          )}
 
-          {/* Темная кинематографичная вуаль, усиливающаяся при появлении букв */}
+          {/* Мягкое затемнение при вылете титров */}
           <motion.div
-            initial={{ opacity: 0.2 }}
-            animate={{ opacity: showTitles ? 0.68 : 0.2 }}
+            initial={{ opacity: 0.12 }}
+            animate={{ opacity: showTitles ? 0.62 : 0.12 }}
             transition={{ duration: 0.65 }}
-            className="pointer-events-none absolute inset-0 z-20 bg-gradient-to-b from-[#04060A]/80 via-[#04060A]/35 to-[#04060A]/85"
+            className="pointer-events-none absolute inset-0 z-20 bg-gradient-to-b from-[#04060A]/65 via-[#04060A]/25 to-[#04060A]/75"
           />
 
-          {/* Верхняя строка для мобильного PWA (бренд-бейдж сверху) */}
-          <div className="pointer-events-none absolute left-4 top-4 sm:left-8 sm:top-7 z-30 flex items-center gap-2.5">
+          {/* Слева сверху — ТОЛЬКО логотип (без надписи) */}
+          <div className="pointer-events-none absolute left-4 top-4 sm:left-7 sm:top-6 z-30">
             <img
               src={assetPath("/logo.png")}
-              alt="FTL"
-              className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl border border-[#F5B041]/60 object-cover shadow-lg"
+              alt="ForexTraining Life"
+              className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl border border-[#F5B041]/70 object-cover shadow-[0_0_20px_rgba(245,176,65,0.35)]"
             />
-            <span className="text-xs sm:text-sm font-extrabold tracking-wide text-white/90 drop-shadow">
-              FTL <span className="text-[#F5B041]">TRADING</span>
-            </span>
           </div>
 
-          {/* Кнопка Пропустить (с учетом отступа safe-area на iPhone/Android PWA) */}
+          {/* Кнопка Пропустить справа сверху */}
           <button
             onClick={handleFinish}
-            className="group absolute right-4 top-4 sm:right-8 sm:top-7 z-40 flex items-center gap-1.5 sm:gap-2 rounded-full border border-white/25 bg-black/65 px-3.5 py-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white backdrop-blur-md hover:border-[#F5B041] hover:bg-black/85 transition cursor-pointer shadow-xl"
+            className="group absolute right-4 top-4 sm:right-7 sm:top-6 z-40 flex items-center gap-1.5 sm:gap-2 rounded-full border border-white/25 bg-black/60 px-3.5 py-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white backdrop-blur-md hover:border-[#F5B041] hover:bg-black/85 transition cursor-pointer shadow-xl"
           >
             <span>{t.intro.skip}</span>
             <SkipForward className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#F5B041] transition-transform group-hover:translate-x-0.5" />
           </button>
 
-          {/* Титры поверх экрана — идеально масштабированы отдельно под мобильный/PWA и под ПК */}
+          {/* Титры: название ForexTraining Life (EN) + слоган «Торгуй и зарабатывай вместе с нами» (RU) */}
           <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center px-4 text-center">
             <AnimatePresence>
               {showTitles && (
@@ -150,9 +156,9 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.35 }}
-                  className="flex w-full max-w-[92vw] sm:max-w-3xl flex-col items-center rounded-2xl bg-black/35 px-4 py-6 sm:px-8 sm:py-8 backdrop-blur-sm border border-white/10 shadow-2xl"
+                  className="flex w-full max-w-[92vw] sm:max-w-3xl flex-col items-center rounded-2xl bg-black/40 px-4 py-6 sm:px-8 sm:py-8 backdrop-blur-sm border border-white/10 shadow-2xl"
                 >
-                  {/* Логотип канала */}
+                  {/* Логотип бренда */}
                   <motion.img
                     src={assetPath("/logo.png")}
                     alt="ForexTraining Life"
@@ -162,7 +168,7 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
                     className="mb-3.5 sm:mb-5 h-14 w-14 sm:h-20 sm:w-20 rounded-2xl border-2 border-[#F5B041] object-cover shadow-[0_0_35px_rgba(245,176,65,0.55)]"
                   />
 
-                  {/* Побуквенно вылетающее название ForexTraining Life */}
+                  {/* Побуквенное появление названия ForexTraining Life */}
                   <h1 className="flex flex-wrap items-center justify-center text-2xl font-black tracking-tight sm:text-5xl md:text-6xl drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)]">
                     {brandLetters.map((char, idx) => {
                       const isLife = idx >= 14;
@@ -190,7 +196,7 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
                     })}
                   </h1>
 
-                  {/* Золотой разделитель */}
+                  {/* Золотая линия */}
                   <motion.div
                     initial={{ scaleX: 0, opacity: 0 }}
                     animate={{ scaleX: 1, opacity: 1 }}
@@ -212,7 +218,7 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
             </AnimatePresence>
           </div>
 
-          {/* Индикатор прогресса в самом низу */}
+          {/* Тонкая полоса прогресса в самом низу */}
           <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-40 h-1 bg-white/10">
             <motion.div
               initial={{ width: "0%" }}
