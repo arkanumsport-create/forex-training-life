@@ -14,7 +14,7 @@ interface IntroPreloaderProps {
 export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [showTitles, setShowTitles] = useState(false);
-  const [isPortraitMobile, setIsPortraitMobile] = useState<boolean | null>(null);
+  const [isMobileView, setIsMobileView] = useState<boolean | null>(null);
   const mainVideoRef = useRef<HTMLVideoElement | null>(null);
   const finishedRef = useRef(false);
   const { lang } = useAppSettings();
@@ -37,7 +37,7 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
     }, 600);
   };
 
-  // Управляем блокировкой скролла строго по состоянию isVisible
+  // Блокируем/разблокируем скролл строго синхронно с видимостью заставки
   useEffect(() => {
     if (isVisible) {
       document.body.style.overflow = "hidden";
@@ -57,11 +57,22 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
       return;
     }
 
-    // Определяем: вертикальный экран телефона/PWA (9:16) или горизонтальный ПК (16:9)
-    const checkIsMobilePortrait = () => {
-      return window.innerWidth < 768 || window.innerHeight > window.innerWidth;
+    // Надежное определение смартфона / PWA (вертикальный экран 9:16) vs ПК (16:9)
+    const detectMobile = () => {
+      const ua = navigator.userAgent || "";
+      const isPhoneUA = /Android|iPhone|iPod|Mobile/i.test(ua);
+      const isNarrow = window.innerWidth <= 820;
+      const isPortrait = window.innerHeight > window.innerWidth;
+      return isPhoneUA || isNarrow || isPortrait;
     };
-    setIsPortraitMobile(checkIsMobilePortrait());
+
+    setIsMobileView(detectMobile());
+
+    const handleResize = () => {
+      setIsMobileView(detectMobile());
+    };
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
 
     // Через ~3.2 сек (столкновение и взрыв Быка и Медведя) выводим титры
     const titleTimer = setTimeout(() => {
@@ -71,26 +82,37 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
     // Плавный переход на сайт
     const exitTimer = setTimeout(() => {
       handleFinish();
-    }, 6200);
+    }, 6300);
 
     return () => {
       unlockScroll();
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
       clearTimeout(titleTimer);
       clearTimeout(exitTimer);
     };
   }, []);
 
-  // Запускаем видео сразу после выбора нужного файла (9:16 или 16:9)
+  // Гарантированный запуск автопроигрывания в Google Chrome / Safari / PWA на телефоне
+  const forcePlayVideo = () => {
+    const vid = mainVideoRef.current;
+    if (!vid) return;
+    vid.muted = true;
+    vid.defaultMuted = true;
+    vid.playsInline = true;
+    vid.play().catch(() => {});
+  };
+
   useEffect(() => {
-    if (isPortraitMobile !== null && mainVideoRef.current) {
-      mainVideoRef.current.play().catch(() => {});
+    if (isMobileView !== null) {
+      forcePlayVideo();
     }
-  }, [isPortraitMobile]);
+  }, [isMobileView]);
 
   const videoSrc =
-    isPortraitMobile === null
+    isMobileView === null
       ? null
-      : isPortraitMobile
+      : isMobileView
       ? assetPath("/videos/bull-bear-intro-mobile.mp4")
       : assetPath("/videos/bull-bear-intro.mp4");
 
@@ -106,72 +128,92 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
             filter: "blur(6px)",
             transition: { duration: 0.6, ease: "easeInOut" },
           }}
-          style={{
-            paddingTop: "env(safe-area-inset-top)",
-            paddingBottom: "env(safe-area-inset-bottom)",
-            paddingLeft: "env(safe-area-inset-left)",
-            paddingRight: "env(safe-area-inset-right)",
-          }}
-          className="fixed inset-0 z-[150] flex h-[100dvh] w-screen items-center justify-center overflow-hidden bg-[#04060A] text-white select-none"
+          className="fixed inset-0 z-[150] flex h-[100dvh] w-screen items-center justify-center overflow-hidden bg-[#030508] text-white select-none"
         >
           {/* Видео-заставка:
-              - Телефон / PWA (9:16): bull-bear-intro-mobile.mp4 во весь вертикальный экран (object-cover)
-              - ПК / Горизонтальный экран (16:9): bull-bear-intro.mp4 четко по размеру экрана (object-contain) */}
+              - Телефон / Google Chrome / Мобильная PWA (9:16): bull-bear-intro-mobile.mp4 во весь вертикальный экран (идеальное вписывание 9:16 без обрезания персонажей)
+              - ПК / Широкий экран (16:9): bull-bear-intro.mp4 четко по центру экрана */}
           {videoSrc && (
-            <div className="absolute inset-0 z-10 flex h-full w-full items-center justify-center bg-[#04060A]">
-              <video
-                ref={mainVideoRef}
-                key={videoSrc}
-                src={videoSrc}
-                autoPlay
-                muted
-                playsInline
-                preload="auto"
-                onEnded={handleFinish}
-                className={
-                  isPortraitMobile
-                    ? "h-full w-full object-cover"
-                    : "h-full w-full max-h-[100dvh] max-w-[100vw] object-contain"
-                }
-              />
+            <div className="absolute inset-0 z-10 flex h-full w-full items-center justify-center bg-[#030508]">
+              {isMobileView ? (
+                /* Мобильный 9:16 режим для телефона и PWA */
+                <div className="relative flex h-[100dvh] w-full max-w-[540px] items-center justify-center overflow-hidden bg-[#030508]">
+                  <video
+                    ref={mainVideoRef}
+                    key={videoSrc}
+                    src={videoSrc}
+                    autoPlay
+                    muted
+                    playsInline
+                    preload="auto"
+                    onLoadedData={forcePlayVideo}
+                    onCanPlay={forcePlayVideo}
+                    onEnded={handleFinish}
+                    className="h-full w-full object-cover object-center"
+                  />
+                </div>
+              ) : (
+                /* ПК 16:9 режим */
+                <video
+                  ref={mainVideoRef}
+                  key={videoSrc}
+                  src={videoSrc}
+                  autoPlay
+                  muted
+                  playsInline
+                  preload="auto"
+                  onLoadedData={forcePlayVideo}
+                  onCanPlay={forcePlayVideo}
+                  onEnded={handleFinish}
+                  className="h-full w-full max-h-[100dvh] max-w-[100vw] object-contain"
+                />
+              )}
             </div>
           )}
 
-          {/* Мягкое затемнение при вылете титров */}
+          {/* Кинематографичная мягкая виньетка сверху и снизу (усиливается на титрах) */}
           <motion.div
-            initial={{ opacity: 0.12 }}
-            animate={{ opacity: showTitles ? 0.62 : 0.12 }}
-            transition={{ duration: 0.65 }}
-            className="pointer-events-none absolute inset-0 z-20 bg-gradient-to-b from-[#04060A]/65 via-[#04060A]/25 to-[#04060A]/75"
+            initial={{ opacity: 0.15 }}
+            animate={{ opacity: showTitles ? 0.65 : 0.15 }}
+            transition={{ duration: 0.6 }}
+            className="pointer-events-none absolute inset-0 z-20 bg-gradient-to-b from-[#030508]/70 via-transparent to-[#030508]/80"
           />
 
-          {/* Слева сверху — ТОЛЬКО логотип (без надписи) */}
-          <div className="pointer-events-none absolute left-4 top-4 sm:left-7 sm:top-6 z-30">
+          {/* Верхняя панель с безопасным отступом safe-area для PWA / iPhone / Android */}
+          <div
+            style={{
+              paddingTop: "max(16px, env(safe-area-inset-top))",
+              paddingLeft: "max(16px, env(safe-area-inset-left))",
+              paddingRight: "max(16px, env(safe-area-inset-right))",
+            }}
+            className="pointer-events-none absolute top-0 left-0 right-0 z-40 flex items-center justify-between sm:px-7 sm:pt-6"
+          >
+            {/* Слева — ТОЛЬКО чистый логотип */}
             <img
               src={assetPath("/logo.png")}
               alt="ForexTraining Life"
-              className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl border border-[#F5B041]/70 object-cover shadow-[0_0_20px_rgba(245,176,65,0.35)]"
+              className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl border border-[#F5B041]/75 object-cover shadow-[0_0_24px_rgba(245,176,65,0.4)]"
             />
+
+            {/* Справа — кнопка Пропустить */}
+            <button
+              onClick={handleFinish}
+              className="pointer-events-auto group flex items-center gap-1.5 sm:gap-2 rounded-full border border-white/25 bg-black/60 px-3.5 py-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white backdrop-blur-md hover:border-[#F5B041] hover:bg-black/85 transition cursor-pointer shadow-xl"
+            >
+              <span>{t.intro.skip}</span>
+              <SkipForward className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#F5B041] transition-transform group-hover:translate-x-0.5" />
+            </button>
           </div>
 
-          {/* Кнопка Пропустить справа сверху */}
-          <button
-            onClick={handleFinish}
-            className="group absolute right-4 top-4 sm:right-7 sm:top-6 z-40 flex items-center gap-1.5 sm:gap-2 rounded-full border border-white/25 bg-black/60 px-3.5 py-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white backdrop-blur-md hover:border-[#F5B041] hover:bg-black/85 transition cursor-pointer shadow-xl"
-          >
-            <span>{t.intro.skip}</span>
-            <SkipForward className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#F5B041] transition-transform group-hover:translate-x-0.5" />
-          </button>
-
-          {/* Титры: название ForexTraining Life (EN) + слоган «Торгуй и зарабатывай вместе с нами» (RU) */}
-          <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center px-4 text-center">
+          {/* Центральные титры: ForexTraining Life (EN) + «Торгуй и зарабатывай вместе с нами» (RU) */}
+          <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center px-5 text-center">
             <AnimatePresence>
               {showTitles && (
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.35 }}
-                  className="flex w-full max-w-[92vw] sm:max-w-3xl flex-col items-center rounded-2xl bg-black/40 px-4 py-6 sm:px-8 sm:py-8 backdrop-blur-sm border border-white/10 shadow-2xl"
+                  initial={{ opacity: 0, scale: 0.94 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4 }}
+                  className="flex w-full max-w-[90vw] sm:max-w-3xl flex-col items-center rounded-2xl border border-[#F5B041]/25 bg-black/45 px-5 py-6 sm:px-8 sm:py-8 backdrop-blur-md shadow-[0_0_50px_rgba(0,0,0,0.85)]"
                 >
                   {/* Логотип бренда */}
                   <motion.img
@@ -180,21 +222,21 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
                     initial={{ scale: 0.6, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ duration: 0.45, type: "spring", stiffness: 210 }}
-                    className="mb-3.5 sm:mb-5 h-14 w-14 sm:h-20 sm:w-20 rounded-2xl border-2 border-[#F5B041] object-cover shadow-[0_0_35px_rgba(245,176,65,0.55)]"
+                    className="mb-3.5 sm:mb-5 h-14 w-14 sm:h-20 sm:w-20 rounded-2xl border-2 border-[#F5B041] object-cover shadow-[0_0_35px_rgba(245,176,65,0.6)]"
                   />
 
-                  {/* Побуквенное появление названия ForexTraining Life */}
-                  <h1 className="flex flex-wrap items-center justify-center text-2xl font-black tracking-tight sm:text-5xl md:text-6xl drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)]">
+                  {/* Побуквенно вылетающее название ForexTraining Life */}
+                  <h1 className="flex flex-wrap items-center justify-center text-[26px] leading-tight font-black tracking-tight sm:text-5xl md:text-6xl drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)]">
                     {brandLetters.map((char, idx) => {
                       const isLife = idx >= 14;
                       return (
                         <motion.span
                           key={`${char}-${idx}`}
-                          initial={{ opacity: 0, y: 20, scale: 0.85, filter: "blur(5px)" }}
+                          initial={{ opacity: 0, y: 18, scale: 0.85, filter: "blur(5px)" }}
                           animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
                           transition={{
-                            duration: 0.32,
-                            delay: idx * 0.038,
+                            duration: 0.3,
+                            delay: idx * 0.036,
                             ease: "easeOut",
                           }}
                           className={
@@ -211,7 +253,7 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
                     })}
                   </h1>
 
-                  {/* Золотая линия */}
+                  {/* Золотой разделитель */}
                   <motion.div
                     initial={{ scaleX: 0, opacity: 0 }}
                     animate={{ scaleX: 1, opacity: 1 }}
@@ -233,12 +275,15 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
             </AnimatePresence>
           </div>
 
-          {/* Тонкая полоса прогресса в самом низу */}
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-40 h-1 bg-white/10">
+          {/* Индикатор прогресса внизу экрана (с учетом нижнего safe-area на iPhone/Android) */}
+          <div
+            style={{ bottom: "env(safe-area-inset-bottom)" }}
+            className="pointer-events-none absolute left-0 right-0 z-40 h-1 bg-white/10"
+          >
             <motion.div
               initial={{ width: "0%" }}
               animate={{ width: "100%" }}
-              transition={{ duration: 6.1, ease: "linear" }}
+              transition={{ duration: 6.2, ease: "linear" }}
               className="h-full bg-gradient-to-r from-[#00E676] via-[#F5B041] to-[#FF3D57]"
             />
           </div>
