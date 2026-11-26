@@ -22,17 +22,36 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
 
   const brandLetters = Array.from("ForexTraining Life");
 
+  const unlockScroll = () => {
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+  };
+
   const handleFinish = () => {
     if (finishedRef.current) return;
     finishedRef.current = true;
+    unlockScroll();
     setIsVisible(false);
     setTimeout(() => {
       onComplete?.();
     }, 600);
   };
 
+  // Управляем блокировкой скролла строго по состоянию isVisible
+  useEffect(() => {
+    if (isVisible) {
+      document.body.style.overflow = "hidden";
+    } else {
+      unlockScroll();
+    }
+    return () => {
+      unlockScroll();
+    };
+  }, [isVisible]);
+
   useEffect(() => {
     if (!siteConfig.features.enableIntroPreloader) {
+      unlockScroll();
       setIsVisible(false);
       onComplete?.();
       return;
@@ -43,10 +62,6 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
       return window.innerWidth < 768 || window.innerHeight > window.innerWidth;
     };
     setIsPortraitMobile(checkIsMobilePortrait());
-
-    // Блокируем скролл страницы во время заставки
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
 
     // Через ~3.2 сек (столкновение и взрыв Быка и Медведя) выводим титры
     const titleTimer = setTimeout(() => {
@@ -59,7 +74,7 @@ export default function IntroPreloader({ onComplete }: IntroPreloaderProps) {
     }, 6200);
 
     return () => {
-      document.body.style.overflow = prevOverflow;
+      unlockScroll();
       clearTimeout(titleTimer);
       clearTimeout(exitTimer);
     };
